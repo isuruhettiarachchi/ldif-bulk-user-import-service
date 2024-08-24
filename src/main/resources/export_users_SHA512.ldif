@@ -1,0 +1,46 @@
+version: 1
+
+dn: ou=users,ou=system
+objectClass: organizationalUnit
+objectClass: top
+ou: users
+
+dn: cn=john+sn=doe,ou=users,ou=system
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: john
+sn: doe
+givenName: John
+mail: john@test.com
+mobile: 0812312311
+userPassword:: e1NIQTUxMn14NjFFeTYxMktsMmdwRkw1NkZUOXdlRG5wU280QVY4ajgrcXgyQ
+ XVUSGRSeVkwMzZ4eHpUVHJ3MTBXcTMrNHFReUIrWFVSUFd4MU9OeHAzWTNwQjM3QT09
+
+dn: cn=rock+sn=sanchez,ou=users,ou=system
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: rick
+sn: sanchez
+givenName: Rick
+mail: rick@test.com
+mobile: 081231321
+userPassword:: e1NIQTUxMn14NjFFeTYxMktsMmdwRkw1NkZUOXdlRG5wU280QVY4ajgrcXgyQ
+ XVUSGRSeVkwMzZ4eHpUVHJ3MTBXcTMrNHFReUIrWFVSUFd4MU9OeHAzWTNwQjM3QT09
+
+dn: cn=morty+sn=smith,ou=users,ou=system
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: morty
+sn: smith
+givenName: Morty
+mail: morty@test.com
+mobile: 07112123111
+userPassword:: e1NIQTUxMn14NjFFeTYxMktsMmdwRkw1NkZUOXdlRG5wU280QVY4ajgrcXgyQ
+ XVUSGRSeVkwMzZ4eHpUVHJ3MTBXcTMrNHFReUIrWFVSUFd4MU9OeHAzWTNwQjM3QT09
+
