@@ -1,5 +1,6 @@
 package org.wso2.ldif.bulk.user.manager.internal;
 
+import org.wso2.carbon.user.core.UserStoreManager;
 import org.wso2.carbon.user.core.service.RealmService;
 
 import java.util.Map;
@@ -11,6 +12,7 @@ public class LdifUserManagerDataHolder {
     private RealmService realmService;
     private Map<String, String> claimAttributeMappings;
     private Properties configs;
+    private UserStoreManager userStoreManager;
 
     public static LdifUserManagerDataHolder getInstance() {
         return dataHolder;
@@ -40,4 +42,11 @@ public class LdifUserManagerDataHolder {
         return configs;
     }
 
+    public void setUserStoreManager(UserStoreManager userStoreManager) {
+        this.userStoreManager = userStoreManager;
+    }
+
+    public UserStoreManager getUserStoreManager() {
+        return userStoreManager;
+    }
 }

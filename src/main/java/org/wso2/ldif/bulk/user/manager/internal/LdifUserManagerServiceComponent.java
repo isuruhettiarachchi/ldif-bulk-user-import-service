@@ -9,6 +9,10 @@ import org.wso2.ldif.bulk.user.manager.LdifUserManager;
 import org.wso2.ldif.bulk.user.manager.constants.Constants;
 import org.wso2.ldif.bulk.user.manager.exceptions.LdifUserImportException;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 @Component(name = "org.wso2.ldif.bulk.user.import.service",
         immediate = true)
 public class LdifUserManagerServiceComponent {
@@ -18,14 +22,12 @@ public class LdifUserManagerServiceComponent {
     @Activate
     protected void activate(ComponentContext context) {
         try {
-            LdifUserManager ldifUserManager = new LdifUserManager();
+            LdifUserManager.loadConfigs();
             if (Boolean.parseBoolean(LdifUserManagerDataHolder.getInstance().
                     getConfigs().getProperty(Constants.ConfigProperties.ADD_USERS))) {
-                try {
-                    ldifUserManager.addUsers();
-                } catch (LdifUserImportException e) {
-                    log.error("Error while adding users", e);
-                }
+                Callable<Boolean> ldifUserManagerThread = new LdifUserManager();
+                ExecutorService executorService = Executors.newSingleThreadExecutor();
+                executorService.submit(ldifUserManagerThread);
             }
         } catch (Throwable e) {
             log.error("Error while activating component", e);

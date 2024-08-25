@@ -9,11 +9,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.user.api.UserStoreException;
 import org.wso2.carbon.user.core.UniqueIDUserStoreManager;
-import org.wso2.carbon.user.core.UserStoreManager;
 import org.wso2.ldif.bulk.user.manager.constants.Constants;
 import org.wso2.ldif.bulk.user.manager.exceptions.LdifUserImportException;
 import org.wso2.ldif.bulk.user.manager.internal.LdifUserManagerDataHolder;
-import org.wso2.ldif.bulk.user.manager.internal.LdifUserManagerServiceComponent;
 import org.wso2.ldif.bulk.user.manager.utils.Utils;
 
 import java.io.FileInputStream;
@@ -21,47 +19,38 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 
-public class LdifUserManager {
+public class LdifUserManager implements Callable<Boolean> {
 
     private static final Log log = LogFactory.getLog(LdifUserManager.class);
 
-    UserStoreManager userStoreManager;
-    Map<String, String> claimMapping;
-
     public LdifUserManager() {
+        super();
+    }
+
+    @Override
+    public Boolean call() throws Exception {
+        return addUsers();
+    }
+
+    public static void loadConfigs() {
         try {
             Utils.loadProperties();
             Utils.loadAttributeClaimMappings();
-            userStoreManager = getUserStoreManager();
-
+            Utils.getUserStoreManager();
         } catch (UserStoreException | LdifUserImportException e) {
             log.error(e.getMessage(), e);
         }
-
     }
 
-    public void addUsers() throws LdifUserImportException {
-
-        /**
-        Map<String, String> claimMapping = new HashMap<>();
-        claimMapping.put("http://wso2.org/claims/mobile", "mobile");
-        claimMapping.put("http://wso2.org/claims/emailaddress", "mail");
-        claimMapping.put("http://wso2.org/claims/givenname", "firstName");
-         **/
-
-        /**
-        Map<String, String> userAttributeValues = new HashMap<>();
-        claimMapping.put("mobile", "0711231231");
-        claimMapping.put("mail", "alex@gmail.com");
-        claimMapping.put("firstName", "Alex");
-         **/
+    private boolean addUsers() throws LdifUserImportException {
 
         Properties configs = LdifUserManagerDataHolder.getInstance().getConfigs();
 
         HashMap<String, String> summary = new HashMap<>();
 
-        claimMapping = LdifUserManagerDataHolder.getInstance().getClaimAttributeMappings();
+        Map<String, String> claimMapping = LdifUserManagerDataHolder.getInstance().getClaimAttributeMappings();
         String usernameAttribute = configs.getProperty(Constants.ConfigProperties.USER_NAME_ATTRIBUTE);
         String passwordAttribute = configs.getProperty(Constants.ConfigProperties.PASSWORD_ATTRIBUTE);
         String passwordAlgValue = configs.getProperty(Constants.ConfigProperties.PASSWORD_ALG);
@@ -71,7 +60,23 @@ public class LdifUserManager {
         boolean continueOnError = Boolean.parseBoolean(configs.
                 getProperty(Constants.ConfigProperties.CONTINUE_ON_ERROR));
 
-        UniqueIDUserStoreManager uniqueIDUserStoreManager = (UniqueIDUserStoreManager) userStoreManager;
+        UniqueIDUserStoreManager uniqueIDUserStoreManager = null;
+
+        long startTime = System.currentTimeMillis();
+        do {
+            uniqueIDUserStoreManager = (UniqueIDUserStoreManager) LdifUserManagerDataHolder.getInstance().
+                    getUserStoreManager().getSecondaryUserStoreManager(userStoreDomain);
+
+            if (System.currentTimeMillis() > startTime + 60000) {
+                break;
+            }
+        } while (uniqueIDUserStoreManager == null);
+
+        if (uniqueIDUserStoreManager == null) {
+            log.error("Unable to get the user store manager within 1 minute. " +
+                    "Skipping the user import");
+            return false;
+        }
 
         String ldifFilePath = LdifUserManagerDataHolder.getInstance().
                 getConfigs().getProperty(Constants.ConfigProperties.LDIF_FILE_PATH);
@@ -99,29 +104,35 @@ public class LdifUserManager {
                             log.info(entry.getDN() + " is added");
                             summary.put(entry.getDN(), "Successfully created");
                         } catch (org.wso2.carbon.user.core.UserStoreException e) {
-                            log.error(e.getMessage(), e);
+                            log.info(e.getMessage());
+                            if (log.isDebugEnabled()) {
+                                log.error("Error while adding user: " + entry.getDN(), e);
+                            }
                             summary.put(entry.getDN(), e.getMessage());
                             if (!continueOnError) {
                                 break;
                             }
+                        } catch (Exception e) {
+                            log.error("Unhandled exception occurred while adding users", e);
+                            throw new LdifUserImportException("Unhandled exception occurred while adding users", e);
                         }
                     }
                 }
             } catch (LDIFException e) {
-                throw new LdifUserImportException("Error while reading ldif data", e);
+                log.error("Error while reading ldif data", e);
+                return false;
             }
         } catch (IOException e) {
-            throw new LdifUserImportException("Error while reading ldif file input stream", e);
+            log.error("Error while reading ldif file input stream", e);
+            return false;
         }
 
         if (MapUtils.isNotEmpty(summary)) {
             System.out.println("User import completed");
             Utils.createImportSummary(summary);
         }
+
+        return true;
     }
 
-    private UserStoreManager getUserStoreManager() throws UserStoreException {
-        return LdifUserManagerDataHolder.getInstance().getRealmService().
-                getBootstrapRealm().getUserStoreManager();
-    }
 }

@@ -2,6 +2,8 @@ package org.wso2.ldif.bulk.user.manager.utils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.wso2.carbon.user.api.UserStoreException;
+import org.wso2.carbon.user.core.UserStoreManager;
 import org.wso2.ldif.bulk.user.manager.constants.Constants;
 import org.wso2.ldif.bulk.user.manager.exceptions.LdifUserImportException;
 import org.wso2.ldif.bulk.user.manager.internal.LdifUserManagerDataHolder;
@@ -30,6 +32,7 @@ public class Utils {
             LdifUserManagerDataHolder.getInstance().setConfigs(properties);
 
         } catch (IOException e) {
+            log.error("Error reading configs", e);
             throw new LdifUserImportException("Error reading configs", e);
         }
     }
@@ -48,6 +51,7 @@ public class Utils {
                 userAttributeMappings.put(key, value);
             }
         } catch (IOException e) {
+            log.error("Error loading attribute claim mappings from file", e);
             throw new LdifUserImportException("Error loading attribute claim mappings from file", e);
         }
 
@@ -114,6 +118,13 @@ public class Utils {
         } catch (IOException e) {
             log.error("Error while writing ldif user import summary", e);
         }
+    }
+
+    public static void getUserStoreManager() throws UserStoreException {
+        LdifUserManagerDataHolder.getInstance().setUserStoreManager(LdifUserManagerDataHolder.
+                getInstance().getRealmService().
+                getBootstrapRealm().getUserStoreManager());
+
     }
 
 }
