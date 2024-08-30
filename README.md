@@ -21,6 +21,7 @@ This service will read a ldif file at the server startup and create users.
    LdifFilePath=~/export_users_SHA512.ldif
    LdapAttributeMappingFilePath=~/mappings.properties
    AddUsers=true
+   ldifEncodedType=ISO_8859_1
    ```
    | Configuration                  | Description                                                                            | Sample value            |
    |--------------------------------|----------------------------------------------------------------------------------------|-------------------------|
@@ -34,6 +35,7 @@ This service will read a ldif file at the server startup and create users.
    | `LdifFilePath`                 | Path to the input LDIF file. This file should contain the user details to be imported. | `~/users.ldif`          |
    | `LdapAttributeMappingFilePath` | Path to the file where LDAP attributes to claim URI mappings available                 | `~/mappings.properties` |
    | `AddUsers`                     | Add users after activating the component                                               | `true`                  |
+   | `ldifEncodedType`              | Encoding type used in the LDAP to encode password hash                                 | `ISO_8859_1`            |
 
 4. Create a LDAP attributes to claims mapping `properties` file. Path of this file should be defined in the `LdapAttributeMappingFilePath` property of `config.properties` file. User will be created with the claims defined in this file. Any other LDAP attribute will be discarded.
 
