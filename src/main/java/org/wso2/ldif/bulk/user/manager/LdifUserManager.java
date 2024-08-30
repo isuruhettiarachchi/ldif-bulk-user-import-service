@@ -7,19 +7,27 @@ import com.unboundid.ldif.LDIFReader;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.user.api.RealmConfiguration;
 import org.wso2.carbon.user.api.UserStoreException;
 import org.wso2.carbon.user.core.UniqueIDUserStoreManager;
+import org.wso2.carbon.user.core.common.User;
 import org.wso2.ldif.bulk.user.manager.constants.Constants;
 import org.wso2.ldif.bulk.user.manager.exceptions.LdifUserImportException;
 import org.wso2.ldif.bulk.user.manager.internal.LdifUserManagerDataHolder;
+import org.wso2.ldif.bulk.user.manager.utils.DataSourceManager;
 import org.wso2.ldif.bulk.user.manager.utils.Utils;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.nio.charset.Charset;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.*;
 import java.util.concurrent.Callable;
+
+import static org.wso2.ldif.bulk.user.manager.utils.Utils.getBase64EncodedSaltedPassword;
+import static org.wso2.ldif.bulk.user.manager.utils.Utils.getSaltString;
 
 public class LdifUserManager implements Callable<Boolean> {
 
@@ -46,6 +54,9 @@ public class LdifUserManager implements Callable<Boolean> {
 
     private boolean addUsers() throws LdifUserImportException {
 
+        PrivilegedCarbonContext carbonContext = PrivilegedCarbonContext.getThreadLocalCarbonContext();
+        carbonContext.setTenantId(-1234, true);
+
         Properties configs = LdifUserManagerDataHolder.getInstance().getConfigs();
 
         HashMap<String, String> summary = new HashMap<>();
@@ -59,6 +70,8 @@ public class LdifUserManager implements Callable<Boolean> {
         String userStoreDomain = configs.getProperty(Constants.ConfigProperties.USER_STORE_DOMAIN);
         boolean continueOnError = Boolean.parseBoolean(configs.
                 getProperty(Constants.ConfigProperties.CONTINUE_ON_ERROR));
+        Charset ldifEncodedCharset = Utils.getLidfEncodedCharset(
+                configs.getProperty(Constants.ConfigProperties.LDIF_ENCODED_TYPE));
 
         UniqueIDUserStoreManager uniqueIDUserStoreManager = null;
 
@@ -78,12 +91,16 @@ public class LdifUserManager implements Callable<Boolean> {
             return false;
         }
 
+        RealmConfiguration realmConfiguration = uniqueIDUserStoreManager.getRealmConfiguration();
+
+        DataSourceManager.getInstance().initUmDataSource(realmConfiguration);
+
         String ldifFilePath = LdifUserManagerDataHolder.getInstance().
                 getConfigs().getProperty(Constants.ConfigProperties.LDIF_FILE_PATH);
         try (FileInputStream inputStream = new FileInputStream(ldifFilePath)) {
             LDIFReader ldifReader = new LDIFReader(inputStream);
             Entry entry;
-            try {
+            try (Connection connection = DataSourceManager.getInstance().getDBConnection()) {
                 while ((entry = ldifReader.readEntry()) != null) {
 
                     if (entry.hasObjectClass("InetOrgPerson")) {
@@ -93,14 +110,21 @@ public class LdifUserManager implements Callable<Boolean> {
                         }
 
                         String username = userStoreDomain + "/" + userAttributeValues.get(usernameAttribute);
-                        String password = userAttributeValues.get(passwordAttribute);
+                        String encodedPassword = userAttributeValues.get(passwordAttribute);
                         if (removeAlgFromPassword) {
-                            password = password.replace(passwordAlgValue, "");
+                            encodedPassword = encodedPassword.replace(passwordAlgValue, "");
                         }
+
+                        byte[] decodedPasswordHash = Base64.getDecoder().decode(encodedPassword);
+
+                        String salt = getSaltString(decodedPasswordHash, ldifEncodedCharset);
+                        String base64EncodedPasswordHash = getBase64EncodedSaltedPassword(decodedPasswordHash);
+
                         Map<String, String> claimList = Utils.getClaimValueMappings(claimMapping, userAttributeValues);
 
                         try {
-                            uniqueIDUserStoreManager.addUserWithID(username, password, null, claimList, null);
+                            User user = uniqueIDUserStoreManager.addUserWithID(username, base64EncodedPasswordHash, null, claimList, null);
+                            Utils.updateSaltValue(connection, user.getUsername(), salt);
                             log.info(entry.getDN() + " is added");
                             summary.put(entry.getDN(), "Successfully created");
                         } catch (org.wso2.carbon.user.core.UserStoreException e) {
@@ -121,6 +145,9 @@ public class LdifUserManager implements Callable<Boolean> {
             } catch (LDIFException e) {
                 log.error("Error while reading ldif data", e);
                 return false;
+            } catch (SQLException e) {
+                log.error("Error when updating sal value", e);
+                throw new RuntimeException(e);
             }
         } catch (IOException e) {
             log.error("Error while reading ldif file input stream", e);

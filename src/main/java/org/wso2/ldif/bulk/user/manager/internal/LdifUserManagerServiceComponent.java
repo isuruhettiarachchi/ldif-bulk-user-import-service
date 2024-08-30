@@ -7,7 +7,6 @@ import org.osgi.service.component.annotations.*;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.ldif.bulk.user.manager.LdifUserManager;
 import org.wso2.ldif.bulk.user.manager.constants.Constants;
-import org.wso2.ldif.bulk.user.manager.exceptions.LdifUserImportException;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -22,6 +21,7 @@ public class LdifUserManagerServiceComponent {
     @Activate
     protected void activate(ComponentContext context) {
         try {
+            log.info("activating ldif service");
             LdifUserManager.loadConfigs();
             if (Boolean.parseBoolean(LdifUserManagerDataHolder.getInstance().
                     getConfigs().getProperty(Constants.ConfigProperties.ADD_USERS))) {
@@ -54,4 +54,6 @@ public class LdifUserManagerServiceComponent {
         LdifUserManagerDataHolder.getInstance().setRealmService(null);
         log.debug("Unsetting realm service");
     }
+
+
 }

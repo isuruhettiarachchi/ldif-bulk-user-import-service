@@ -3,8 +3,6 @@ package org.wso2.ldif.bulk.user.manager.utils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.user.api.UserStoreException;
-import org.wso2.carbon.user.core.UserStoreManager;
-import org.wso2.ldif.bulk.user.manager.constants.Constants;
 import org.wso2.ldif.bulk.user.manager.exceptions.LdifUserImportException;
 import org.wso2.ldif.bulk.user.manager.internal.LdifUserManagerDataHolder;
 
@@ -12,11 +10,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.wso2.ldif.bulk.user.manager.constants.Constants.*;
@@ -26,7 +28,7 @@ public class Utils {
     private static final Log log = LogFactory.getLog(Utils.class);
 
     public static void loadProperties() throws LdifUserImportException {
-        try (FileInputStream inputStream = new FileInputStream(Constants.CONFIG_PROPERTIES_FILE)) {
+        try (FileInputStream inputStream = new FileInputStream(CONFIG_PROPERTIES_FILE)) {
             Properties properties = new Properties();
             properties.load(inputStream);
             LdifUserManagerDataHolder.getInstance().setConfigs(properties);
@@ -39,7 +41,7 @@ public class Utils {
 
     public static void loadAttributeClaimMappings() throws LdifUserImportException {
         String filePath = LdifUserManagerDataHolder.getInstance().getConfigs().
-                getProperty(Constants.ConfigProperties.LDAP_ATTRIBUTE_MAPPING_FILE_PATH);
+                getProperty(ConfigProperties.LDAP_ATTRIBUTE_MAPPING_FILE_PATH);
         Map<String, String> userAttributeMappings = new HashMap<>();
 
         try (FileInputStream fis = new FileInputStream(filePath)) {
@@ -126,5 +128,47 @@ public class Utils {
                 getBootstrapRealm().getUserStoreManager());
 
     }
+
+    public static String getSaltString(byte[] decodedPasswordHash, Charset encodedCharset) {
+
+        char[] decodedPasswordCharArray = encodedCharset.decode(ByteBuffer.wrap(decodedPasswordHash)).array();
+
+        char[] saltCharArray = Arrays.copyOfRange(decodedPasswordCharArray, 64, decodedPasswordHash.length);
+
+        return new String(saltCharArray);
+
+    }
+
+    public static String getBase64EncodedSaltedPassword(byte[] decodedPasswordHash) {
+
+        byte[] passwordHash = new byte[64];
+        System.arraycopy(decodedPasswordHash, 0, passwordHash, 0, passwordHash.length);
+
+        return Base64.getEncoder().encodeToString(passwordHash);
+
+    }
+
+    public static Charset getLidfEncodedCharset(String encodedCharset) {
+        if (Objects.equals(encodedCharset, CHARSET_ISO_8859_1)) {
+            return StandardCharsets.ISO_8859_1;
+        } else {
+            return StandardCharsets.UTF_8;
+        }
+    }
+
+    public static void updateSaltValue(Connection connection, String username, String salt) {
+        try {
+            connection.setAutoCommit(false);
+            PreparedStatement preparedStatement = connection.prepareStatement(SqlQueries.UPDATE_SALT);
+            preparedStatement.setString(1, salt);
+            preparedStatement.setString(2, username);
+            preparedStatement.execute();
+            connection.commit();
+        } catch (SQLException e) {
+            log.error("Error when updating salt value", e);
+            throw new RuntimeException(e);
+        }
+    }
+
 
 }

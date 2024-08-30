@@ -8,6 +8,8 @@ public class Constants {
     public static final String OUTPUT_DIRECTORY = "output";
     public static final String IMPORT_SUMMARY_FILE_NAME = "bulk-import-summary.txt";
 
+    public static final String CHARSET_ISO_8859_1 = "ISO_8859_1";
+
     public static class ConfigProperties {
         public static final String USER_STORE_DOMAIN = "userStoreDomain";
         public static final String USER_NAME_ATTRIBUTE = "userNameAttribute";
@@ -18,7 +20,12 @@ public class Constants {
         public static final String LDIF_FILE_PATH = "LdifFilePath";
         public static final String LDAP_ATTRIBUTE_MAPPING_FILE_PATH = "LdapAttributeMappingFilePath";
         public static final String PASSWORD_ATTRIBUTE = "passwordAttribute";
+        public static final String LDIF_ENCODED_TYPE = "ldifEncodedType";
 
         public static final String ADD_USERS = "AddUsers";
+    }
+
+    public static class SqlQueries {
+        public static final String UPDATE_SALT = "UPDATE UM_USER SET UM_SALT_VALUE = ? WHERE UM_USER_NAME = ?";
     }
 }
